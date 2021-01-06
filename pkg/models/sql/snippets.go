@@ -1,29 +1,77 @@
-package mysql
+package postgreSql
 
 import (
-	"database/sql"
-	// Import the models package that we just created. You need to prefix this with
-	// whatever module path you set up back in chapter 02.02 (Project Setup and Enabling // Modules) so that the import statement looks like this:
-	// "{your-module-path}/pkg/models".
-	"alexedwards.net/snippetbox/pkg/models"
+	"context"
+	"errors"
+	"fmt"
+	"github.com/jackc/pgx/v4"
+	"softarch/pkg/models"
 )
 
 // Define a SnippetModel type which wraps a sql.DB connection pool.
 type SnippetModel struct {
-	DB *sql.DB
-}
-
-// This will insert a new snippet into the database.
-func (m *SnippetModel) Insert(title, content, expires string) (int, error) {
-	return 0, nil
+	DB *pgx.Conn
 }
 
 // This will return a specific snippet based on its id.
 func (m *SnippetModel) Get(id int) (*models.Snippet, error) {
-	return nil, nil
+	//Query
+	s := &models.Snippet{}
+	stml := "SELECT id, title, content, created, expires FROM snippets WHERE expires > CLOCK_TIMESTAMP() AND id=$1"
+
+	err := m.DB.QueryRow(context.Background(), stml, id).Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, models.ErrNoRecord
+		} else {
+			return nil, err
+		}
+	}
+
+	return s, nil
 }
 
 // This will return the 10 most recently created snippets.
 func (m *SnippetModel) Latest() ([]*models.Snippet, error) {
-	return nil, nil
+	stml := "SELECT id, title, content, created, expires FROM snippets " +
+		"WHERE expires > CLOCK_TIMESTAMP() ORDER BY created DESC LIMIT 10"
+
+	rows, err := m.DB.Query(context.Background(), stml)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	snippets := []*models.Snippet{}
+
+	for rows.Next() {
+		s := &models.Snippet{}
+
+		err = rows.Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires)
+		if err != nil {
+			return nil, err
+		}
+
+		snippets = append(snippets, s)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return snippets, err
+}
+
+func (m *SnippetModel) Insert(title, content, expires string) (int, error) {
+	stml := "INSERT INTO snippets (title, content, created, expires)" +
+		"VALUES($1, $2, CLOCK_TIMESTAMP(), (CLOCK_TIMESTAMP()+INTERVAL '%s days')) RETURNING id"
+	stml = fmt.Sprintf(stml, expires)
+	fmt.Println(stml)
+	var lastId int
+	err := m.DB.QueryRow(context.Background(), stml, title, content).Scan(&lastId)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(lastId), err
 }

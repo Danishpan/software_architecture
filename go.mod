@@ -1,4 +1,4 @@
-module alexedwards.net/snippetbox
+module softarch
 
 go 1.15
 
