@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"log"
 	"net/http"
 	"os"
@@ -36,7 +36,7 @@ func main() {
 		errorLog.Fatal(err)
 	}
 
-	defer db.Close(context.Background())
+	defer db.Close()
 
 	//Creating application
 	app := &application{
@@ -61,13 +61,10 @@ func main() {
 
 }
 
-func openDB(dsn string) (*pgx.Conn, error) {
-	conn, err := pgx.Connect(context.Background(), dsn)
+func openDB(dsn string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.Connect(context.Background(), dsn)
 	if err != nil {
 		return nil, err
 	}
-	if err = conn.Ping(context.Background()); err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return pool, nil
 }

@@ -3,14 +3,16 @@ package postgreSql
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"softarch/pkg/models"
+	"strconv"
+	"time"
 )
 
 // Define a SnippetModel type which wraps a sql.DB connection pool.
 type SnippetModel struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
 // This will return a specific snippet based on its id.
@@ -63,12 +65,13 @@ func (m *SnippetModel) Latest() ([]*models.Snippet, error) {
 }
 
 func (m *SnippetModel) Insert(title, content, expires string) (int, error) {
-	stml := "INSERT INTO snippets (title, content, created, expires)" +
-		"VALUES($1, $2, CLOCK_TIMESTAMP(), (CLOCK_TIMESTAMP()+INTERVAL '%s days')) RETURNING id"
-	stml = fmt.Sprintf(stml, expires)
-	fmt.Println(stml)
+	stml := "INSERT INTO snippets (title, content, created, expires)" + "VALUES($1, $2, $3, $4) RETURNING id"
+	d, err := strconv.Atoi(expires)
+	if err != nil {
+		return 0, err
+	}
 	var lastId int
-	err := m.DB.QueryRow(context.Background(), stml, title, content).Scan(&lastId)
+	err = m.DB.QueryRow(context.Background(), stml, title, content, time.Now(), time.Now().AddDate(0, 0, d)).Scan(&lastId)
 	if err != nil {
 		return 0, err
 	}
