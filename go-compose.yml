@@ -1,0 +1,18 @@
+version: "3.8"
+
+volumes:
+  postgres_volume:
+
+services:
+  snippetbox:
+    build: ./
+    restart: always
+    ports:
+    - 4000:4000
+
+  postgresdb:
+    image: postgres:latest
+    volumes:
+    - ./.database/postgres/data:/var/lib/postgresql/data
+    ports:
+    - 5435:5435
